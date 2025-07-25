@@ -1,3 +1,7 @@
-Dice/bin/Debug/Dice.exe.config
+**/bin/
+**/obj/
 Dice/App.config
 .vs
+*.user
+*.suo
+*.log
