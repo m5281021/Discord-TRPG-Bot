@@ -19,54 +19,36 @@ namespace Dice
 {
     class Program
     {
-        private DiscordSocketClient _client;
-        private CommandService _commands;
-        private IServiceProvider _services;
-        private readonly string token;
-
-        public Program()
-        {
-            token = System.Configuration.ConfigurationManager.AppSettings["DiscordBotToken"];
-        }
-
         static void Main(string[] args)
         {
-            new Program().MainAsync().GetAwaiter().GetResult();
-        }
-
-        public async Task MainAsync()
-        {
-            var config = new DiscordSocketConfig
+            var module = new DiceModule();
+            Console.WriteLine("コマンドを入力してください(dice 6 / power k50[9]+10 / expect k40[8]+8$+1#1r5など):");
+            while (true)
             {
-                GatewayIntents = GatewayIntents.Guilds | GatewayIntents.GuildMessages | GatewayIntents.MessageContent
-            };
-            _client = new DiscordSocketClient(config);
-            _commands = new CommandService();
-            _client.MessageReceived += HandleCommandAsync;
-            _client.Log += Log;
-            await _client.LoginAsync(TokenType.Bot, token);
-            await _client.StartAsync();
-            await _commands.AddModulesAsync(Assembly.GetEntryAssembly(), _services);
-            await Task.Delay(-1);
-        }
+                Console.Write("> ");
+                var input = Console.ReadLine();
+                if (input == "exit") break;
 
-        private Task Log(LogMessage msg)
-        {
-            Console.WriteLine(msg.ToString());
-            return Task.CompletedTask;
-        }
-        private async Task HandleCommandAsync(SocketMessage arg)
-        {
-            var message = arg as SocketUserMessage;
-            if (message == null || message.Author.IsBot) return;
-
-            int argPos = 0;
-            if (message.HasCharPrefix('!', ref argPos))
-            {
-                var context = new SocketCommandContext(_client, message);
-                var result = await _commands.ExecuteAsync(context, argPos, _services);
-                if (!result.IsSuccess)
-                    await context.Channel.SendMessageAsync(result.ErrorReason);
+                if (input.StartsWith("dice"))
+                {
+                    var tokens = input.Split(' ');
+                    int sides = tokens.Length > 1 && int.TryParse(tokens[1], out var s) ? s : 6;
+                    module.DiceCLI(sides);
+                }
+                else if (input.StartsWith("power"))
+                {
+                    var param = input.Substring("power".Length).Trim();
+                    module.PowerCLI(param);
+                }
+                else if (input.StartsWith("expect"))
+                {
+                    var param = input.Substring("expect".Length).Trim();
+                    module.ExpectCLI(param);
+                }
+                else
+                {
+                    Console.WriteLine("不明なコマンドです。dice / power / expect / exit が使えます。");
+                }
             }
         }
     }
@@ -104,27 +86,25 @@ namespace Dice
             });
         }
 
-        [Command("dice")]
-        public async Task DiceAsync(int sides = 6)
+        public void DiceCLI(int sides = 6)
         {
             if (sides < 1)
             {
-                await ReplyAsync("正の整数を指定してください。");
+                Console.WriteLine("正の整数を指定してください。");
                 return;
             }
 
             Random random = new Random();
             int result = random.Next(1, sides + 1);
 
-            await ReplyAsync($"{Context.User.Username}さんが振った{sides}面体のダイスの結果は: {result}です！");
+            Console.WriteLine($"{sides}面体のダイスの結果は、{result}です。");
         }
 
-        [Command("power")]
-        public async Task PowerAsync(string input = null)
+        public void PowerCLI(string input = null)
         {
             if (input == null)
             {
-                await ReplyAsync("計算する対象を指定してください。");
+                Console.WriteLine("計算する対象を指定してください。");
                 return;
             }
 
@@ -134,7 +114,7 @@ namespace Dice
 
             if (!match.Success)
             {
-                await ReplyAsync($"{power}は、形式が間違っています。");
+                Console.WriteLine($"{power}は、形式が間違っています。");
                 return;
             }
 
@@ -169,7 +149,7 @@ namespace Dice
                 sumFaces.Add(sum.ToString());
                 if (right == 1 && left == 1)
                 {
-                    damages.Add("\\*\\*");
+                    damages.Add("**");
                     break;
                 }
                 string thisDamage = tableOfPower[p + 1][sum - 1].ToString();
@@ -181,22 +161,21 @@ namespace Dice
                 result += " ";
             }
             string total = (totaldamage + extra).ToString();
-            if (totaldamage == 0 && damages.Count == 1 && damages[0] == "\\*\\*") total = "\\*\\*";
+            if (totaldamage == 0 && damages.Count == 1 && damages[0] == "**") total = "**";
             result += $"]={string.Join(",", sumFaces)} > ";
-            if (total != "\\*\\*") result += $"{string.Join(",", damages)}+{extra} > ";
+            if (total != "**") result += $"{string.Join(",", damages)}+{extra} > ";
             if (criticalNumber > 0) result += $"{criticalNumber}回転 > ";
             result += $"{total}";
-            if (total == "\\*\\*") result += " > 自動的失敗";
-            await ReplyAsync(result);
+            if (total == "**") result += " > 自動的失敗";
+            Console.WriteLine(result);
         }
 
 
-        [Command("expect")]
-        public async Task EVAsync(string input = null)
+        public void ExpectCLI(string input = null)
         {
             if (input == null)
             {
-                await ReplyAsync("計算する対象を指定してください。");
+                Console.WriteLine("計算する対象を指定してください。");
                 return;
             }
 
@@ -207,7 +186,7 @@ namespace Dice
 
             if(!(matchPower.Success || matchDice.Success))
             {
-                await ReplyAsync($"{str}は、登録されていない形式です。\n以下のパターンのみ有効です。\n{patternForPower}\n{patternForDice}");
+                Console.WriteLine($"{str}は、登録されていない形式です。\n以下のパターンのみ有効です。\n{patternForPower}\n{patternForDice}");
                 return;
             }
 
@@ -221,7 +200,7 @@ namespace Dice
             {
                 expectedValue = CalculateExpectedValueOfDice(str);
             }
-            await ReplyAsync($"{str}の期待値は、{expectedValue:F3}です。");
+            Console.WriteLine($"{str}の期待値は、{expectedValue:F3}です。");
         }
 
         public List<int> SeparateOfDice(string str)
